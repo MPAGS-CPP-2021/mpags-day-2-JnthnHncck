@@ -2,13 +2,18 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
 
-#include "TransformChar.hpp" 
+#include "TransformChar.hpp"
+#include "runCaesarCipher.hpp"
 
 bool processCommandLine(const std::vector<std::string>& args,
 const std::size_t& nArgs,
 bool& helpRequested,
 bool& versionRequested,
+bool& doCipher,
+bool& encrypt,
+size_t& key,
 std::string& inputFileName,
 std::string& outputFileName)
 {
@@ -44,6 +49,29 @@ std::string& outputFileName)
                     // Got filename, so assign value and advance past it
                     outputFileName = args[i + 1];
                     ++i;
+                }    
+            } else if (args[i] == "-d") {
+                doCipher = true;
+                if (i == nArgs - 1) {
+                    std::cerr << "[error] -d requires a key argument"
+                            << std::endl;
+                    // exit main with non-zero return to indicate failure
+                    return 1;
+                } else{
+                    key = std::stoul(args[i + 1]);
+                    ++i;
+                }
+            } else if (args[i] == "-e") {
+                doCipher = true;
+                encrypt = true;
+                if (i == nArgs - 1) {
+                    std::cerr << "[error] -e requires a key argument"
+                            << std::endl;
+                    // exit main with non-zero return to indicate failure
+                    return 1;
+                } else{
+                    key = std::stoul(args[i + 1]);
+                    ++i;
                 }
             } else {
                 // Have an unknown flag to output error message and return non-zero
@@ -53,7 +81,7 @@ std::string& outputFileName)
                 return 1;
             }
     }
-    return(0);
+    return 0;
 }
 
 
@@ -66,13 +94,16 @@ int main(int argc, char* argv[])
     // Options that might be set by the command-line arguments
     bool helpRequested{false};
     bool versionRequested{false};
+    bool doCipher{false};
+    bool encrypt{false};
+    size_t key{0};
     std::string inputFile{""};
     std::string outputFile{""};
 
-    bool commandLineStatus= processCommandLine(cmdLineArgs, nCmdLineArgs, helpRequested, versionRequested, inputFile, outputFile);
+    bool commandLineStatus= processCommandLine(cmdLineArgs, nCmdLineArgs, helpRequested, versionRequested, doCipher, encrypt, key, inputFile, outputFile);
     if (commandLineStatus)
     {
-        return(1);
+        return 1;
     }
 
     // Handle help, if requested
@@ -107,26 +138,48 @@ int main(int argc, char* argv[])
     std::string inputText;
 
     // Read in user input from stdin/file
-    // Warn that input file option not yet implemented
+    // If there is no input, use text instead
     if (!inputFile.empty()) {
-        std::cerr << "[warning] input from file ('" << inputFile
-                  << "') not implemented yet, using stdin\n";
+        
+        std::ifstream in_file {inputFile};
+        //Checks that the file can be opened
+        bool ok_to_read = in_file.good();
+        if (!ok_to_read) {
+            return 1;
+        }
+        char inputCharF {'x'};
+
+        while (in_file >> inputCharF) {
+            inputText += transformChar(inputCharF);
+        }
+        in_file.close();
+    }
+    else {
+        // loop over each character from user input
+        while (std::cin >> inputChar) {
+            inputText += transformChar(inputChar);
+        }
     }
 
-    // loop over each character from user input
-    while (std::cin >> inputChar) {
-        inputText += transformChar(inputChar);
+    if (doCipher){
+        inputText = runCaesarCipher(inputText, key, encrypt);
     }
-
-
-    // Warn that output file option not yet implemented
+    
     if (!outputFile.empty()) {
-        std::cerr << "[warning] output to file ('" << outputFile
-                  << "') not implemented yet, using stdout\n";
+        std::ofstream out_file {outputFile};
+        //Checks that the file can be opened
+        bool ok_to_read = out_file.good();
+        if (!ok_to_read) {
+            return 1;
+        }
+        out_file << inputText;
+        out_file.close();
     }
-
-    // Print out the transliterated text
-    std::cout << inputText << std::endl;
+    else {
+        // Print out the transliterated text
+        std::cout << inputText << std::endl;
+    }
+    
 
     // No requirement to return from main, but we do so for clarity
     // and for consistency with other functions
